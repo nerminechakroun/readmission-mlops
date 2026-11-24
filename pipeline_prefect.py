@@ -1,9 +1,10 @@
 from prefect import task, flow
 from main import prepare, train, save, load, evaluate
+
 import argparse
 
 # ============================================================
-# 2.1 - TASKS PRINCIPALES
+# TASKS
 # ============================================================
 
 
@@ -42,11 +43,6 @@ def evaluate_model_task():
     return evaluate()
 
 
-# ============================================================
-# ETAPE 4 - TASKS DE SUIVI DU CODE
-# ============================================================
-
-
 @task(name="format-code")
 def format_code_task():
     import subprocess
@@ -82,8 +78,24 @@ def unit_tests_task():
 
 
 # ============================================================
-# 2.2 - FLOWS
+# FLOWS
 # ============================================================
+
+
+@flow(name="install")
+def install_flow():
+    install_dependencies()
+
+
+@flow(name="clean")
+def clean_flow():
+    prepare_data_task()
+
+
+@flow(name="train")
+def train_flow():
+    prepare_data_task()
+    train_model_task()
 
 
 @flow(name="code")
@@ -94,30 +106,36 @@ def code_flow():
     unit_tests_task()
 
 
-@flow(name="all")
-def all_flow():
-    install_dependencies()
-    code_flow()
-    prepare_data_task()
-    train_model_task()
-    save_model_task()
-    evaluate_model_task()
-
-
-@flow(name="train")
-def train_flow():
-    prepare_data_task()
-    train_model_task()
-
-
 @flow(name="evaluate")
 def evaluate_flow():
     load_model_task()
     evaluate_model_task()
 
 
+@flow(name="all")
+def all_flow():
+
+    # Installation
+    install_dependencies()
+
+    # Tests et qualité du code
+    code_flow()
+
+    # Préparation des données
+    prepare_data_task()
+
+    # Entraînement
+    train_model_task()
+
+    # Sauvegarde
+    save_model_task()
+
+    # Évaluation
+    evaluate_model_task()
+
+
 # ============================================================
-# 2.3 - SCRIPT
+# CLI
 # ============================================================
 
 if __name__ == "__main__":
@@ -125,7 +143,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--flow", choices=["all", "train", "evaluate", "code"], required=True
+        "--flow", choices=["all", "install", "clean", "code", "evaluate"], required=True
     )
 
     args = parser.parse_args()
@@ -133,11 +151,14 @@ if __name__ == "__main__":
     if args.flow == "all":
         all_flow()
 
-    elif args.flow == "train":
-        train_flow()
+    elif args.flow == "install":
+        install_flow()
 
-    elif args.flow == "evaluate":
-        evaluate_flow()
+    elif args.flow == "clean":
+        clean_flow()
 
     elif args.flow == "code":
         code_flow()
+
+    elif args.flow == "evaluate":
+        evaluate_flow()
